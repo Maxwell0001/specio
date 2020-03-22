@@ -173,9 +173,15 @@ def _decode_5105(data):
     return np.frombuffer(data, dtype=np.float32)
 
 
-FUNC_DECODE = {5100: _decode_5100,
-               5104: _decode_5104,
-               5105: _decode_5105}
+
+FUNC_DECODE = {5100: _decode_5100,    # header info
+               5104: _decode_5104,    # release sw block for storing ALL of component 2d data
+               5105: _decode_5105,    # point coordinates (FloatArray)
+               5101:"not_read",       # point coordinates (CvCoOrdArray)
+               5102:"not_read",       # point coordinates (continuator for large CvCoOrdArray)
+               5103:"not_read",       # temp block for storing part of component 2d dataset
+               5106:"not_read",       # point coordinates (continuator for large FloatArray)
+               5107:"not_read"}       # history record
 
 
 class FSM(Format):
@@ -258,15 +264,20 @@ class FSM(Format):
                 n_bytes = 6
                 block_id, block_size = _block_info(
                     content[start_byte:start_byte + n_bytes])
+               
                 # read the upcoming block
                 start_byte += n_bytes
                 n_bytes = block_size
-                data_extracted = FUNC_DECODE[block_id](
-                    content[start_byte:start_byte + n_bytes])
-                if isinstance(data_extracted, dict):
-                    meta.update(data_extracted)
+                
+                if FUNC_DECODE[block_id] == "not_read":
+                    pass
                 else:
-                    spectrum.append(data_extracted)
+                    data_extracted = FUNC_DECODE[block_id](
+                        content[start_byte:start_byte + n_bytes])
+                    if isinstance(data_extracted, dict):
+                        meta.update(data_extracted)
+                    else:
+                        spectrum.append(data_extracted)
 
             spectrum = np.squeeze(spectrum)
             # we add a value such that we include the endpoint
